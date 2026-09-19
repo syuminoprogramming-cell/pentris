@@ -155,9 +155,9 @@
                 <p>←/→: 移動</p>
                 <p>↓: 落下</p>
                 <p style="color: #FFD700;">Space:<br>一括落下</p>
-                <p>Q/W: 回転</p>
-                <p style="color: #0DC2FF;">E: 反転</p>
-                <p style="color: #FF70A6;"><strong>C/Shift:<br>HOLD</strong></p>
+                <p>Q/W/Z/↑: 回転</p>
+                <p style="color: #0DC2FF;">E/V: 反転</p>
+                <p style="color: #FF70A6;"><strong>C:<br>HOLD</strong></p>
             </div>
         </div>
 
@@ -357,12 +357,55 @@ function drawGrid() {
     }
 }
 
+// 落下予測（ゴースト位置）の計算関数
+function getGhostPosition() {
+    if (!player.matrix) return player.pos.y;
+    
+    const ghostPos = { x: player.pos.x, y: player.pos.y };
+    const tempPlayer = { pos: ghostPos, matrix: player.matrix };
+
+    while (!collide(arena, tempPlayer)) {
+        ghostPos.y++;
+    }
+    return ghostPos.y - 1;
+}
+
+// 落下予測ブロックの描画関数
+function drawGhost() {
+    if (!player.matrix) return;
+    
+    const ghostY = getGhostPosition();
+    const ghostOffset = { x: player.pos.x, y: ghostY };
+
+    player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                const px = x + ghostOffset.x;
+                const py = y + ghostOffset.y;
+
+                // 枠線だけ描画してゴースト表示
+                context.strokeStyle = colors[value];
+                context.lineWidth = 0.08;
+                context.strokeRect(px + 0.05, py + 0.05, 0.9, 0.9);
+
+                // 半透明の背景を入れて見やすくする
+                context.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                context.fillRect(px + 0.05, py + 0.05, 0.9, 0.9);
+            }
+        });
+    });
+}
+
 function draw() {
     context.fillStyle = '#000';
     context.fillRect(0, 0, canvas.width, canvas.height);
 
     drawGrid();
     drawMatrix(context, arena, {x: 0, y: 0});
+    
+    // 落下地点（ゴースト）を操作中ピースより前に描画
+    drawGhost();
+
     drawMatrix(context, player.matrix, player.pos);
 }
 
@@ -647,7 +690,6 @@ document.addEventListener('keydown', event => {
         playerFlip();
     } else if (event.keyCode === 86) { // V
         playerFlip();
-//    } else if (event.keyCode === 67 || event.keyCode === 16) { // C / Shift
     } else if (event.keyCode === 67) { // C 
         event.preventDefault();
         playerHold();
