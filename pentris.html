@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ペントミノ・テトリス (コンパクト版)</title>
+    <title>ペントミノ・テトリス (T-Spin & Kick対応)</title>
     <style>
         body {
             background-color: #202028;
@@ -62,6 +62,7 @@
             background: #ff6b81;
         }
         .container {
+            position: relative;
             display: flex;
             gap: 12px;
             align-items: flex-start;
@@ -123,6 +124,20 @@
         .controls p {
             margin: 2px 0;
         }
+        #tspinNotice {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: bold;
+            font-size: 1rem;
+            color: #FFE138;
+            text-shadow: 0 0 6px #000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -143,6 +158,8 @@
     </div>
 
     <div class="container">
+        <div id="tspinNotice">T-SPIN!</div>
+
         <!-- 左パネル：HOLD & 操作説明 -->
         <div class="side-panel">
             <div class="box-container">
@@ -198,11 +215,12 @@ const nextCanvases = [
 ];
 const nextContexts = nextCanvases.map(c => c.getContext('2d'));
 
-const BLOCK_SIZE = 15; // マス目を小さく設定 (20 -> 15)
+const BLOCK_SIZE = 15;
 const BOARD_HEIGHT = 20;
 let BOARD_WIDTH = 24;
 
-// ペントミノ12種類の定義
+let lastActionWasRotate = false; // 回転フラグ
+
 function createPiece(type) {
     if (type === 'I') {
         return [
@@ -347,6 +365,32 @@ function collide(arena, player) {
     return false;
 }
 
+function isOccupied(x, y) {
+    if (x < 0 || x >= BOARD_WIDTH || y >= BOARD_HEIGHT) return true;
+    if (y < 0) return false;
+    return arena[y][x] !== 0;
+}
+
+// 3-Point T-Spin 判定 (T型の交差点中心の斜め4マスをチェック)
+function checkTSpin() {
+    if (!lastActionWasRotate || player.type !== 'T') return false;
+
+    // Tペントミノ中心 (x:1, y:0) の周囲4つの対角角
+    const corners = [
+        {x: player.pos.x, y: player.pos.y - 1},     // 左上
+        {x: player.pos.x + 2, y: player.pos.y - 1}, // 右上
+        {x: player.pos.x, y: player.pos.y + 1},     // 左下
+        {x: player.pos.x + 2, y: player.pos.y + 1}  // 右下
+    ];
+
+    let occupiedCount = 0;
+    corners.forEach(c => {
+        if (isOccupied(c.x, c.y)) occupiedCount++;
+    });
+
+    return occupiedCount >= 3;
+}
+
 function drawGrid() {
     context.strokeStyle = '#333';
     context.lineWidth = 0.05;
@@ -357,7 +401,6 @@ function drawGrid() {
     }
 }
 
-// 落下予測（ゴースト位置）の計算関数
 function getGhostPosition() {
     if (!player.matrix) return player.pos.y;
     
@@ -370,7 +413,6 @@ function getGhostPosition() {
     return ghostPos.y - 1;
 }
 
-// 落下予測ブロックの描画関数
 function drawGhost() {
     if (!player.matrix) return;
     
@@ -383,12 +425,10 @@ function drawGhost() {
                 const px = x + ghostOffset.x;
                 const py = y + ghostOffset.y;
 
-                // 枠線だけ描画してゴースト表示
                 context.strokeStyle = colors[value];
                 context.lineWidth = 0.08;
                 context.strokeRect(px + 0.05, py + 0.05, 0.9, 0.9);
 
-                // 半透明の背景を入れて見やすくする
                 context.fillStyle = 'rgba(255, 255, 255, 0.1)';
                 context.fillRect(px + 0.05, py + 0.05, 0.9, 0.9);
             }
@@ -402,10 +442,7 @@ function draw() {
 
     drawGrid();
     drawMatrix(context, arena, {x: 0, y: 0});
-    
-    // 落下地点（ゴースト）を操作中ピースより前に描画
     drawGhost();
-
     drawMatrix(context, player.matrix, player.pos);
 }
 
@@ -478,8 +515,19 @@ function merge(arena, player) {
     });
 }
 
+function showTspinNotice(text) {
+    const el = document.getElementById('tspinNotice');
+    el.innerText = text;
+    el.style.opacity = '1';
+    setTimeout(() => {
+        el.style.opacity = '0';
+    }, 1200);
+}
+
 function arenaSweep() {
-    let rowCount = 1;
+    let clearedLines = 0;
+    const isTspin = checkTSpin();
+
     outer: for (let y = arena.length - 1; y > 0; --y) {
         for (let x = 0; x < arena[y].length; ++x) {
             if (arena[y][x] === 0) {
@@ -489,10 +537,27 @@ function arenaSweep() {
         const row = arena.splice(y, 1)[0].fill(0);
         arena.unshift(row);
         ++y;
-
-        player.score += rowCount * 10;
-        rowCount *= 2;
+        clearedLines++;
     }
+
+    if (isTspin) {
+        if (clearedLines === 0) {
+            player.score += 400;
+            showTspinNotice("T-SPIN!");
+        } else if (clearedLines === 1) {
+            player.score += 800;
+            showTspinNotice("T-SPIN SINGLE!");
+        } else if (clearedLines === 2) {
+            player.score += 1200;
+            showTspinNotice("T-SPIN DOUBLE!!");
+        } else if (clearedLines >= 3) {
+            player.score += 1600;
+            showTspinNotice("T-SPIN TRIPLE!!!");
+        }
+    } else if (clearedLines > 0) {
+        player.score += clearedLines * 100 * Math.pow(2, clearedLines - 1);
+    }
+
     updateScore();
 }
 
@@ -509,19 +574,35 @@ function rotate(matrix, dir) {
     }
 }
 
+// SRS（スライド・キック）付き回転：狭い穴へ滑り込ませるためのオフセット検証
 function playerRotate(dir) {
-    const pos = player.pos.x;
-    let offset = 1;
+    const origX = player.pos.x;
+    const origY = player.pos.y;
+    
     rotate(player.matrix, dir);
-    while (collide(arena, player)) {
-        player.pos.x += offset;
-        offset = -(offset + (offset > 0 ? 1 : -1));
-        if (offset > player.matrix[0].length) {
-            rotate(player.matrix, -dir);
-            player.pos.x = pos;
+
+    // 回転時に試行するキックパターン（移動 offset: dx, dy）
+    const kickOffsets = [
+        {x: 0, y: 0},
+        {x: -1, y: 0}, {x: 1, y: 0},
+        {x: 0, y: -1}, {x: -1, y: -1}, {x: 1, y: -1},
+        {x: -2, y: 0}, {x: 2, y: 0},
+        {x: 0, y: 1},  {x: 0, y: 2} // 下方向の押し込み潜り
+    ];
+
+    for (let offset of kickOffsets) {
+        player.pos.x = origX + offset.x;
+        player.pos.y = origY + offset.y;
+        if (!collide(arena, player)) {
+            lastActionWasRotate = true; // 壁蹴りスピン成功
             return;
         }
     }
+
+    // どのオフセットでも干渉する場合は回転キャンセル
+    rotate(player.matrix, -dir);
+    player.pos.x = origX;
+    player.pos.y = origY;
 }
 
 function flip(matrix) {
@@ -529,18 +610,27 @@ function flip(matrix) {
 }
 
 function playerFlip() {
-    const pos = player.pos.x;
-    let offset = 1;
+    const origX = player.pos.x;
+    const origY = player.pos.y;
+    
     flip(player.matrix);
-    while (collide(arena, player)) {
-        player.pos.x += offset;
-        offset = -(offset + (offset > 0 ? 1 : -1));
-        if (offset > player.matrix[0].length) {
-            flip(player.matrix);
-            player.pos.x = pos;
+
+    const kickOffsets = [
+        {x: 0, y: 0}, {x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1}
+    ];
+
+    for (let offset of kickOffsets) {
+        player.pos.x = origX + offset.x;
+        player.pos.y = origY + offset.y;
+        if (!collide(arena, player)) {
+            lastActionWasRotate = false;
             return;
         }
     }
+
+    flip(player.matrix);
+    player.pos.x = origX;
+    player.pos.y = origY;
 }
 
 function playerHold() {
@@ -560,6 +650,7 @@ function playerHold() {
     }
 
     canHold = false;
+    lastActionWasRotate = false;
     drawHoldPiece();
 }
 
@@ -568,8 +659,10 @@ function playerDrop() {
     if (collide(arena, player)) {
         player.pos.y--;
         merge(arena, player);
-        playerReset();
         arenaSweep();
+        playerReset();
+    } else {
+        lastActionWasRotate = false;
     }
     dropCounter = 0;
 }
@@ -583,8 +676,8 @@ function playerHardDrop() {
     player.pos.y--;
     player.score += (dropDistance - 1) * 2;
     merge(arena, player);
-    playerReset();
     arenaSweep();
+    playerReset();
     dropCounter = 0;
 }
 
@@ -592,6 +685,8 @@ function playerMove(dir) {
     player.pos.x += dir;
     if (collide(arena, player)) {
         player.pos.x -= dir;
+    } else {
+        lastActionWasRotate = false;
     }
 }
 
@@ -601,6 +696,7 @@ function playerReset() {
     player.pos.y = 0;
     player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
     canHold = true;
+    lastActionWasRotate = false;
 
     drawNextPieces();
 
