@@ -224,11 +224,11 @@ let lastActionWasRotate = false; // 回転フラグ
 function createPiece(type) {
     if (type === 'I') {
         return [
-            [0,0,1,0,0],
-            [0,0,1,0,0],
-            [0,0,1,0,0],
-            [0,0,1,0,0],
-            [0,0,1,0,0],
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+            [1,1,1,1,1],
+            [0,0,0,0,0],
         ];
     } else if (type === 'F') {
         return [
@@ -247,7 +247,7 @@ function createPiece(type) {
         return [
             [0,4,4],
             [0,4,4],
-            [0,4,0],
+            [0,0,4],
         ];
     } else if (type === 'N') {
         return [
