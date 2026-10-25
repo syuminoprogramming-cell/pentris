@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ペントミノ・テトリス (Player vs AI 対戦モード)</title>
+    <style>
+        body {
+            background-color: #1a1a24;
+            color: #fff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+        h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.3rem;
+            letter-spacing: 1px;
+            color: #0DC2FF;
+            text-shadow: 0 0 10px rgba(13, 194, 255, 0.4);
+        }
+        .settings {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #282836;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            border: 1px solid #444;
+        }
+        .settings label {
+            font-weight: bold;
+        }
+        .settings select, .settings button {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        .settings select {
+            background: #fff;
+            color: #000;
+        }
+        .settings button {
+            background: #0DC2FF;
+            color: #000;
+            font-weight: bold;
+        }
+        .settings button:hover {
+            background: #00A3E0;
+        }
+        .battle-container {
+            position: relative;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            justify-content: center;
+        }
+        .player-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #222230;
+            padding: 8px;
+            border-radius: 8px;
+            border: 2px solid #333;
+        }
+        .player-box.human { border-color: #0DC2FF; }
+        .player-box.ai { border-color: #ff4757; }
+
+        .player-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 6px;
+            width: 100%;
+        }
+        .player-box h2 {
+            margin: 0 0 2px 0;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+        .human h2 { color: #0DC2FF; }
+        .ai h2 { color: #ff4757; }
+
+        /* 盤面上部にスコアを配置 */
+        .board-score {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 4px #000;
+        }
+
+        .board-wrapper {
+            position: relative;
+        }
+        canvas.board {
+            border: 2px solid #555;
+            background-color: #000;
+            display: block;
+        }
+
+        /* 中央のHOLD・NEXT情報パネル */
+        .center-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 80px;
+        }
+        .box-container {
+            background: #111;
+            border: 1px solid #444;
+            padding: 4px;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+        .box-container h3 {
+            margin: 0;
+            font-size: 0.65rem;
+            color: #aaa;
+        }
+        .panel-canvas {
+            background: #000;
+            border: 1px solid #333;
+        }
+
+        .help-notice {
+            font-size: 0.65rem;
+            color: #888;
+            margin-top: 4px;
+            text-align: center;
+        }
+
+        /* 操作方法ポップアップモーダル */
+        #helpModal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(3px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 90;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            border-radius: 8px;
+        }
+        #helpModal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .help-content {
+            background: #1e1e28;
+            border: 1.5px solid #0DC2FF;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #ddd;
+            max-width: 240px;
+            text-align: left;
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+        }
+        .help-content h3 {
+            margin: 0 0 8px 0;
+            color: #0DC2FF;
+            text-align: center;
+        }
+
+        /* 勝敗ポップアップ overlay */
+        #gameOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(2px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            border-radius: 8px;
+        }
+        #gameOverlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #winnerText {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 6px;
+            text-shadow: 0 0 10px #000, 0 0 5px #000;
+        }
+        .final-scores {
+            font-size: 0.85rem;
+            color: #fff;
+            text-shadow: 0 0 6px #000, 0 0 3px #000;
+            margin-bottom: 12px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        #overlayRestartBtn {
+            padding: 8px 18px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            background: #2ed573;
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        #overlayRestartBtn:hover {
+            background: #26af5f;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PENTOMINO TETRIS : VS AI</h1>
+
+    <div class="settings">
+        <label for="aiSpeedSelect">AIスピード:</label>
+        <select id="aiSpeedSelect">
+            <option value="0">最速</option>
+            <option value="200">0.2秒</option>
+            <option value="500">0.5秒</option>
+            <option value="1000">1秒</option>
+            <option value="1500">1.5秒</option>
+            <option value="2000" selected>2秒 (デフォルト)</option>
+        </select>
+
+        <button id="toggleHelpBtn">操作説明 (H)</button>
+        <button id="restartBtn">対戦リセット</button>
+    </div>
+
+    <div class="battle-container">
+
+        <!-- 操作説明ポップアップ -->
+        <div id="helpModal">
+            <div class="help-content">
+                <h3>操作方法</h3>
+                <p>← / → : 移動</p>
+                <p>↓ : 落下</p>
+                <p style="color: #FFD700;">Space : 一括落下</p>
+                <p>Q / A / Z / ↑ : 左回転</p>
+                <p>W : 右回転</p>
+                <p style="color: #0DC2FF;">E / V : 反転</p>
+                <p style="color: #FF70A6;">C : HOLD</p>
+                <p style="color: #aaa; font-size: 0.75rem; text-align: center; margin-top: 8px;">[ H ] キーで閉じる</p>
+            </div>
+        </div>
+
+        <!-- 勝敗表示オーバーレイ -->
+        <div id="gameOverlay">
+            <div id="winnerText">PLAYER WIN!</div>
+            <div class="final-scores">
+                PLAYER: <span id="finalPlayerScore" style="color: #0DC2FF; font-weight: bold;">0</span> / 
+                AI: <span id="finalAiScore" style="color: #ff4757; font-weight: bold;">0</span>
+            </div>
+            <button id="overlayRestartBtn">もう一度対戦する</button>
+        </div>
+
+        <!-- PLAYER 盤面 (左) -->
+        <div class="player-box human">
+            <div class="player-header">
+                <h2>PLAYER (YOU)</h2>
+                <div id="playerScore" class="board-score">0</div>
+            </div>
+            <div class="board-wrapper">
+                <canvas id="playerCanvas" class="board" width="144" height="240"></canvas>
+            </div>
+        </div>
+
+        <!-- 中央パネル：HOLD / NEXT (3個) -->
+        <div class="center-panel">
+            <div class="box-container">
+                <h3>HOLD</h3>
+                <canvas id="holdCanvas" class="panel-canvas" width="50" height="50"></canvas>
+            </div>
+
+            <div class="box-container">
+                <h3>NEXT</h3>
+                <canvas id="next1" class="panel-canvas" width="50" height="50"></canvas>
+                <canvas id="next2" class="panel-canvas" width="50" height="50"></canvas>
+                <canvas id="next3" class="panel-canvas" width="50" height="50"></canvas>
+            </div>
+
+            <div class="help-notice">[ H ] 操作説明</div>
+        </div>
+
+        <!-- AI 盤面 (右) -->
+        <div class="player-box ai">
+            <div class="player-header">
+                <h2>AI</h2>
+                <div id="aiScore" class="board-score">0</div>
+            </div>
+            <div class="board-wrapper">
+                <canvas id="aiCanvas" class="board" width="144" height="240"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+const BLOCK_SIZE = 12;
+const BOARD_WIDTH = 12;
+const BOARD_HEIGHT = 20;
+const GARBAGE_COLOR_INDEX = 13;
+
+const colors = [
+    null,
+    '#FF0D72', '#0DC2FF', '#0DFF72', '#F538FF',
+    '#FF8E0D', '#FFE138', '#3877FF', '#FF5722',
+    '#4CAF50', '#9C27B0', '#E91E63', '#00BCD4',
+    '#7f8c8d' // お邪魔ブロック (グレー)
+];
+
+function createPiece(type) {
+    if (type === 'I') {
+        return [
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+            [0,0,0,0,0],
+            [1,1,1,1,1],
+            [0,0,0,0,0],
+        ];
+    } else if (type === 'F') {
+        return [
+            [0,2,2],
+            [2,2,0],
+            [0,2,0],
+        ];
+    } else if (type === 'L') {
+        return [
+            [0,3,0,0],
+            [0,3,0,0],
+            [0,3,0,0],
+            [0,3,3,0],
+        ];
+    } else if (type === 'P') {
+        return [
+            [0,4,4],
+            [0,4,4],
+            [0,0,4],
+        ];
+    } else if (type === 'N') {
+        return [
+            [0,5,0,0],
+            [0,5,5,0],
+            [0,0,5,0],
+            [0,0,5,0],
+        ];
+    } else if (type === 'T') {
+        return [
+            [6,6,6],
+            [0,6,0],
+            [0,6,0],
+        ];
+    } else if (type === 'U') {
+        return [
+            [7,0,7],
+            [7,7,7],
+            [0,0,0],
+        ];
+    } else if (type === 'V') {
+        return [
+            [8,0,0],
+            [8,0,0],
+            [8,8,8],
+        ];
+    } else if (type === 'W') {
+        return [
+            [9,0,0],
+            [9,9,0],
+            [0,9,9],
+        ];
+    } else if (type === 'X') {
+        return [
+            [0,10,0],
+            [10,10,10],
+            [0,10,0],
+        ];
+    } else if (type === 'Y') {
+        return [
+            [0,0,11,0],
+            [11,11,11,11],
+            [0,0,0,0],
+            [0,0,0,0],
+        ];
+    } else if (type === 'Z') {
+        return [
+            [12,12,0],
+            [0,12,0],
+            [0,12,12],
+        ];
+    }
+}
+
+function createMatrix(w, h) {
+    const matrix = [];
+    while (h--) {
+        matrix.push(new Array(w).fill(0));
+    }
+    return matrix;
+}
+
+let isBattleOver = false;
+let aiTimer = null;
+
+// プレイヤー管理クラス
+class TetrisPlayer {
+    constructor(canvas, isAI = false) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.isAI = isAI;
+
+        this.arena = createMatrix(BOARD_WIDTH, BOARD_HEIGHT);
+        this.score = 0;
+        this.pos = { x: 0, y: 0 };
+        this.matrix = null;
+        this.type = null;
+
+        this.bag = [];
+        this.pieceQueue = [];
+        this.holdType = null;
+        this.canHold = true;
+        this.lastActionWasRotate = false;
+        this.dropCounter = 0;
+    }
+
+    fillBag() {
+        const pieces = ['I', 'F', 'L', 'P', 'N', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+        for (let i = pieces.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+        }
+        this.bag.push(...pieces);
+    }
+
+    getNextPieceType() {
+        while (this.pieceQueue.length < 5) {
+            if (this.bag.length === 0) {
+                this.fillBag();
+            }
+            this.pieceQueue.push(this.bag.shift());
+        }
+        return this.pieceQueue.shift();
+    }
+
+    resetPiece() {
+        this.type = this.getNextPieceType();
+        this.matrix = createPiece(this.type);
+        this.pos.y = 0;
+        this.pos.x = (BOARD_WIDTH / 2 | 0) - (this.matrix[0].length / 2 | 0);
+        this.canHold = true;
+        this.lastActionWasRotate = false;
+
+        if (this.collide()) {
+            endGame(this.isAI ? "PLAYER WIN!" : "AI WIN!");
+        }
+    }
+
+    collide(posOffset = { x: 0, y: 0 }, matrix = this.matrix) {
+        const px = this.pos.x + posOffset.x;
+        const py = this.pos.y + posOffset.y;
+        for (let y = 0; y < matrix.length; ++y) {
+            for (let x = 0; x < matrix[y].length; ++x) {
+                if (matrix[y][x] !== 0) {
+                    const boardY = y + py;
+                    const boardX = x + px;
+                    if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT) return true;
+                    if (boardY >= 0 && this.arena[boardY][boardX] !== 0) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    merge() {
+        this.matrix.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    const boardY = y + this.pos.y;
+                    const boardX = x + this.pos.x;
+                    if (boardY >= 0 && boardY < BOARD_HEIGHT) {
+                        this.arena[boardY][boardX] = value;
+                    }
+                }
+            });
+        });
+    }
+
+    sweep() {
+        let clearedLines = 0;
+        outer: for (let y = this.arena.length - 1; y >= 0; --y) {
+            for (let x = 0; x < this.arena[y].length; ++x) {
+                if (this.arena[y][x] === 0) {
+                    continue outer;
+                }
+            }
+            const row = this.arena.splice(y, 1)[0].fill(0);
+            this.arena.unshift(row);
+            ++y;
+            clearedLines++;
+        }
+
+        if (clearedLines > 0) {
+            this.score += clearedLines * 100 * Math.pow(2, clearedLines - 1);
+            updateScores();
+
+            // お邪魔行送信数: 1行消し=0, 2行消し=1, 3行消し=2, 4行以上=3
+            const garbageToSend = Math.max(0, clearedLines - 1);
+            if (garbageToSend > 0) {
+                const opponent = this.isAI ? humanPlayer : aiPlayer;
+                opponent.addGarbageLines(garbageToSend);
+            }
+        }
+    }
+
+    addGarbageLines(count) {
+        for (let i = 0; i < count; i++) {
+            const emptyCol = Math.floor(Math.random() * BOARD_WIDTH);
+            const line = new Array(BOARD_WIDTH).fill(GARBAGE_COLOR_INDEX);
+            line[emptyCol] = 0;
+
+            this.arena.shift();
+            this.arena.push(line);
+        }
+
+        if (this.collide()) {
+            this.pos.y--;
+            if (this.collide()) {
+                endGame(this.isAI ? "PLAYER WIN!" : "AI WIN!");
+            }
+        }
+    }
+
+    drop() {
+        if (isBattleOver) return;
+        this.pos.y++;
+        if (this.collide()) {
+            this.pos.y--;
+            this.merge();
+            this.sweep();
+            this.resetPiece();
+        }
+        this.dropCounter = 0;
+    }
+
+    hardDrop() {
+        if (isBattleOver) return;
+        while (!this.collide({ x: 0, y: 1 })) {
+            this.pos.y++;
+        }
+        this.merge();
+        this.sweep();
+        this.resetPiece();
+        this.dropCounter = 0;
+    }
+
+    move(dir) {
+        if (isBattleOver) return;
+        this.pos.x += dir;
+        if (this.collide()) {
+            this.pos.x -= dir;
+        }
+    }
+
+    rotate(dir) {
+        if (isBattleOver) return;
+        const origX = this.pos.x;
+        const origY = this.pos.y;
+        
+        rotateMatrix(this.matrix, dir);
+
+        const kickOffsets = [
+            {x: 0, y: 0}, {x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1},
+            {x: -1, y: -1}, {x: 1, y: -1}, {x: -2, y: 0}, {x: 2, y: 0}
+        ];
+
+        for (let offset of kickOffsets) {
+            if (!this.collide(offset)) {
+                this.pos.x += offset.x;
+                this.pos.y += offset.y;
+                return;
+            }
+        }
+
+        rotateMatrix(this.matrix, -dir);
+        this.pos.x = origX;
+        this.pos.y = origY;
+    }
+
+    flip() {
+        if (isBattleOver) return;
+        const origX = this.pos.x;
+        const origY = this.pos.y;
+        
+        flipMatrix(this.matrix);
+
+        const kickOffsets = [
+            {x: 0, y: 0}, {x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: -1}
+        ];
+
+        for (let offset of kickOffsets) {
+            if (!this.collide(offset)) {
+                this.pos.x += offset.x;
+                this.pos.y += offset.y;
+                return;
+            }
+        }
+
+        flipMatrix(this.matrix);
+        this.pos.x = origX;
+        this.pos.y = origY;
+    }
+
+    hold() {
+        if (!this.canHold || isBattleOver) return;
+
+        if (this.holdType === null) {
+            this.holdType = this.type;
+            this.resetPiece();
+        } else {
+            const temp = this.type;
+            this.type = this.holdType;
+            this.holdType = temp;
+
+            this.matrix = createPiece(this.type);
+            this.pos.y = 0;
+            this.pos.x = (BOARD_WIDTH / 2 | 0) - (this.matrix[0].length / 2 | 0);
+        }
+
+        this.canHold = false;
+        if (!this.isAI) drawHoldAndNextUI();
+    }
+
+    getGhostY() {
+        let ghostY = this.pos.y;
+        while (!this.collide({ x: 0, y: ghostY - this.pos.y + 1 })) {
+            ghostY++;
+        }
+        return ghostY;
+    }
+
+    draw() {
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.ctx.strokeStyle = '#222';
+        this.ctx.lineWidth = 0.05;
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                this.ctx.strokeRect(x, y, 1, 1);
+            }
+        }
+
+        drawMatrixOnCtx(this.ctx, this.arena, { x: 0, y: 0 });
+
+        if (this.matrix && !isBattleOver) {
+            const ghostY = this.getGhostY();
+            this.matrix.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        const px = x + this.pos.x;
+                        const py = y + ghostY;
+                        this.ctx.strokeStyle = colors[value];
+                        this.ctx.lineWidth = 0.08;
+                        this.ctx.strokeRect(px + 0.05, py + 0.05, 0.9, 0.9);
+                        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                        this.ctx.fillRect(px + 0.05, py + 0.05, 0.9, 0.9);
+                    }
+                });
+            });
+
+            drawMatrixOnCtx(this.ctx, this.matrix, this.pos);
+        }
+    }
+}
+
+function rotateMatrix(matrix, dir) {
+    for (let y = 0; y < matrix.length; ++y) {
+        for (let x = 0; x < y; ++x) {
+            [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        }
+    }
+    if (dir > 0) matrix.forEach(row => row.reverse());
+    else matrix.reverse();
+}
+
+function flipMatrix(matrix) {
+    matrix.forEach(row => row.reverse());
+}
+
+function drawMatrixOnCtx(ctx, matrix, offset) {
+    if (!matrix) return;
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                const px = x + offset.x;
+                const py = y + offset.y;
+
+                ctx.fillStyle = colors[value];
+                ctx.fillRect(px, py, 1, 1);
+
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 0.08;
+                ctx.strokeRect(px, py, 1, 1);
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 0.04;
+                ctx.strokeRect(px + 0.05, py + 0.05, 0.9, 0.9);
+            }
+        });
+    });
+}
+
+const holdCanvas = document.getElementById('holdCanvas');
+const holdContext = holdCanvas.getContext('2d');
+const nextCanvases = [
+    document.getElementById('next1'),
+    document.getElementById('next2'),
+    document.getElementById('next3')
+];
+const nextContexts = nextCanvases.map(c => c.getContext('2d'));
+
+function drawPreviewPiece(ctx, type) {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, 50, 50);
+
+    if (type) {
+        const matrix = createPiece(type);
+        const size = matrix.length;
+        const cellSize = 8;
+        const offsetX = (50 - size * cellSize) / 2;
+        const offsetY = (50 - size * cellSize) / 2;
+
+        matrix.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    ctx.fillStyle = colors[value];
+                    ctx.fillRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(offsetX + x * cellSize, offsetY + y * cellSize, cellSize, cellSize);
+                }
+            });
+        });
+    }
+}
+
+function drawHoldAndNextUI() {
+    drawPreviewPiece(holdContext, humanPlayer.holdType);
+    nextContexts.forEach((ctx, idx) => {
+        drawPreviewPiece(ctx, humanPlayer.pieceQueue[idx]);
+    });
+}
+
+function updateScores() {
+    document.getElementById('playerScore').innerText = humanPlayer.score;
+    document.getElementById('aiScore').innerText = aiPlayer.score;
+}
+
+/* --- 高速 AI ロジック --- */
+
+function evaluateBoard(board) {
+    const h = board.length;
+    const w = board[0].length;
+    const heights = new Array(w).fill(0);
+    let holes = 0;
+    let totalHeight = 0;
+    let maxHeight = 0;
+    let coveredHoles = 0;
+
+    for (let x = 0; x < w; x++) {
+        let blockFound = false;
+        let blockCountAbove = 0;
+        for (let y = 0; y < h; y++) {
+            if (board[y][x] !== 0) {
+                if (!blockFound) {
+                    heights[x] = h - y;
+                    blockFound = true;
+                }
+                blockCountAbove++;
+            } else if (blockFound) {
+                holes++;
+                coveredHoles += blockCountAbove;
+            }
+        }
+        totalHeight += heights[x];
+        if (heights[x] > maxHeight) maxHeight = heights[x];
+    }
+
+    let bumpiness = 0;
+    for (let x = 0; x < w - 1; x++) {
+        bumpiness += Math.abs(heights[x] - heights[x + 1]);
+    }
+
+    let completeLines = 0;
+    for (let y = 0; y < h; y++) {
+        let full = true;
+        for (let x = 0; x < w; x++) {
+            if (board[y][x] === 0) { full = false; break; }
+        }
+        if (full) completeLines++;
+    }
+
+    return (
+        - (holes * 45.0)
+        - (coveredHoles * 15.0)
+        - (maxHeight * 12.0)
+        - (totalHeight * 2.5)
+        - (bumpiness * 3.0)
+        + (completeLines * 35.0)
+    );
+}
+
+function simulateLanding(board, pMatrix, startX) {
+    const h = board.length;
+    const w = board[0].length;
+    const pLen = pMatrix.length;
+
+    let minX = w, maxX = -1;
+    for (let r = 0; r < pLen; r++) {
+        for (let c = 0; c < pLen; c++) {
+            if (pMatrix[r][c] !== 0) {
+                if (c < minX) minX = c;
+                if (c > maxX) maxX = c;
+            }
+        }
+    }
+    if (minX === w) return null;
+    if (startX + minX < 0 || startX + maxX >= w) return null;
+
+    const checkOverlap = (posY) => {
+        for (let r = 0; r < pLen; r++) {
+            for (let c = 0; c < pLen; c++) {
+                if (pMatrix[r][c] !== 0) {
+                    const boardY = posY + r;
+                    const boardX = startX + c;
+                    if (boardY >= h || (boardY >= 0 && board[boardY][boardX] !== 0)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
+
+    if (checkOverlap(0)) return null;
+
+    let posY = 0;
+    while (!checkOverlap(posY + 1)) {
+        posY++;
+    }
+
+    const newBoard = board.map(row => row.slice());
+    for (let r = 0; r < pLen; r++) {
+        for (let c = 0; c < pLen; c++) {
+            if (pMatrix[r][c] !== 0) {
+                const boardY = posY + r;
+                const boardX = startX + c;
+                if (boardY >= 0 && boardY < h && boardX >= 0 && boardX < w) {
+                    newBoard[boardY][boardX] = pMatrix[r][c];
+                }
+            }
+        }
+    }
+
+    for (let y = h - 1; y >= 0; y--) {
+        let full = true;
+        for (let x = 0; x < w; x++) {
+            if (newBoard[y][x] === 0) { full = false; break; }
+        }
+        if (full) {
+            newBoard.splice(y, 1);
+            newBoard.unshift(new Array(w).fill(0));
+            y++;
+        }
+    }
+
+    return newBoard;
+}
+
+function getUniqueOrientations(pType) {
+    let base = createPiece(pType);
+    const orientations = [];
+    const seen = new Set();
+
+    for (let flipState = 0; flipState < 2; flipState++) {
+        let current = base.map(row => row.slice());
+        if (flipState === 1) flipMatrix(current);
+
+        for (let rot = 0; rot < 4; rot++) {
+            let rotated = current.map(row => row.slice());
+            for (let r = 0; r < rot; r++) rotateMatrix(rotated, 1);
+
+            const key = JSON.stringify(rotated);
+            if (!seen.has(key)) {
+                seen.add(key);
+                orientations.push({ matrix: rotated });
+            }
+        }
+    }
+    return orientations;
+}
+
+function getValidMovesForPiece(board, pType) {
+    const moves = [];
+    const orientations = getUniqueOrientations(pType);
+    const w = board[0].length;
+
+    for (let ori of orientations) {
+        for (let x = -2; x < w; x++) {
+            const landedBoard = simulateLanding(board, ori.matrix, x);
+            if (landedBoard !== null) {
+                moves.push({
+                    matrix: ori.matrix,
+                    x: x,
+                    landedBoard: landedBoard
+                });
+            }
+        }
+    }
+    return moves;
+}
+
+function findBestAIMove() {
+    const currentType = aiPlayer.type;
+    const nextType = aiPlayer.pieceQueue[0];
+    const holdType = aiPlayer.holdType;
+
+    const options = [
+        { useHold: false, pieceType: currentType, firstNextType: nextType }
+    ];
+
+    if (aiPlayer.canHold) {
+        const targetHoldType = (holdType === null) ? nextType : holdType;
+        const targetFirstNextType = (holdType === null) ? aiPlayer.pieceQueue[1] : nextType;
+        options.push({ useHold: true, pieceType: targetHoldType, firstNextType: targetFirstNextType });
+    }
+
+    let bestScore = -Infinity;
+    let bestMove = null;
+
+    for (let opt of options) {
+        const firstMoves = getValidMovesForPiece(aiPlayer.arena, opt.pieceType);
+
+        for (let move1 of firstMoves) {
+            const secondMoves = getValidMovesForPiece(move1.landedBoard, opt.firstNextType);
+
+            let maxSecondScore = -Infinity;
+            if (secondMoves.length > 0) {
+                for (let move2 of secondMoves) {
+                    const score = evaluateBoard(move2.landedBoard);
+                    if (score > maxSecondScore) {
+                        maxSecondScore = score;
+                    }
+                }
+            } else {
+                maxSecondScore = -99999;
+            }
+
+            if (maxSecondScore > bestScore) {
+                bestScore = maxSecondScore;
+                bestMove = {
+                    useHold: opt.useHold,
+                    matrix: move1.matrix,
+                    x: move1.x
+                };
+            }
+        }
+    }
+
+    return bestMove;
+}
+
+function aiStep() {
+    if (isBattleOver) return;
+
+    const move = findBestAIMove();
+    if (!move) {
+        aiPlayer.hardDrop();
+        return;
+    }
+
+    if (move.useHold) {
+        aiPlayer.hold();
+    }
+
+    aiPlayer.matrix = move.matrix;
+    aiPlayer.pos.x = move.x;
+
+    let ghostY = aiPlayer.pos.y;
+    while (!aiPlayer.collide({ x: 0, y: ghostY - aiPlayer.pos.y + 1 })) {
+        ghostY++;
+    }
+    aiPlayer.pos.y = ghostY;
+
+    aiPlayer.merge();
+    aiPlayer.sweep();
+    aiPlayer.resetPiece();
+
+    if (!isBattleOver) {
+        const speed = parseInt(document.getElementById('aiSpeedSelect').value, 10);
+        aiTimer = setTimeout(aiStep, speed);
+    }
+}
+
+/* --- ゲーム全体制御 --- */
+
+let humanPlayer;
+let aiPlayer;
+
+function initGame() {
+    if (aiTimer) {
+        clearTimeout(aiTimer);
+        aiTimer = null;
+    }
+    isBattleOver = false;
+    document.getElementById('gameOverlay').classList.remove('active');
+
+    const pCanvas = document.getElementById('playerCanvas');
+    const aCanvas = document.getElementById('aiCanvas');
+
+    pCanvas.getContext('2d').setTransform(BLOCK_SIZE, 0, 0, BLOCK_SIZE, 0, 0);
+    aCanvas.getContext('2d').setTransform(BLOCK_SIZE, 0, 0, BLOCK_SIZE, 0, 0);
+
+    humanPlayer = new TetrisPlayer(pCanvas, false);
+    aiPlayer = new TetrisPlayer(aCanvas, true);
+
+    humanPlayer.resetPiece();
+    aiPlayer.resetPiece();
+
+    updateScores();
+    drawHoldAndNextUI();
+
+    const speed = parseInt(document.getElementById('aiSpeedSelect').value, 10);
+    aiTimer = setTimeout(aiStep, speed);
+}
+
+function endGame(winnerText) {
+    if (isBattleOver) return;
+    isBattleOver = true;
+
+    if (aiTimer) {
+        clearTimeout(aiTimer);
+        aiTimer = null;
+    }
+
+    const overlay = document.getElementById('gameOverlay');
+    const textEl = document.getElementById('winnerText');
+    const finalPlayerScoreEl = document.getElementById('finalPlayerScore');
+    const finalAiScoreEl = document.getElementById('finalAiScore');
+
+    textEl.innerText = winnerText;
+    textEl.style.color = winnerText.includes("PLAYER") ? "#0DC2FF" : "#ff4757";
+
+    finalPlayerScoreEl.innerText = humanPlayer.score;
+    finalAiScoreEl.innerText = aiPlayer.score;
+
+    overlay.classList.add('active');
+}
+
+function toggleHelpModal() {
+    const modal = document.getElementById('helpModal');
+    modal.classList.toggle('active');
+}
+
+document.getElementById('restartBtn').addEventListener('click', initGame);
+document.getElementById('overlayRestartBtn').addEventListener('click', initGame);
+document.getElementById('toggleHelpBtn').addEventListener('click', toggleHelpModal);
+
+let lastTime = 0;
+function gameLoop(time = 0) {
+    const deltaTime = time - lastTime;
+    lastTime = time;
+
+    if (!isBattleOver) {
+        humanPlayer.dropCounter += deltaTime;
+        if (humanPlayer.dropCounter > 1000) {
+            humanPlayer.drop();
+            drawHoldAndNextUI();
+        }
+    }
+
+    humanPlayer.draw();
+    aiPlayer.draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+document.addEventListener('keydown', event => {
+    // H キーで操作説明モーダル切替
+    if (event.keyCode === 72) { // 'H'
+        toggleHelpModal();
+        return;
+    }
+
+    if (isBattleOver) return;
+
+    if (event.keyCode === 37) { // ←
+        humanPlayer.move(-1);
+    } else if (event.keyCode === 39) { // →
+        humanPlayer.move(1);
+    } else if (event.keyCode === 40) { // ↓
+        humanPlayer.drop();
+        drawHoldAndNextUI();
+    } else if (event.keyCode === 32) { // Space
+        event.preventDefault();
+        humanPlayer.hardDrop();
+        drawHoldAndNextUI();
+    } else if (event.keyCode === 81 || event.keyCode === 65 || event.keyCode === 90) { // Q / A / Z (左回転)
+        humanPlayer.rotate(-1);
+    } else if (event.keyCode === 87 || event.keyCode === 38) { // W / ↑ (右回転)
+        humanPlayer.rotate(1);
+    } else if (event.keyCode === 69 || event.keyCode === 86) { // E / V (反転)
+        humanPlayer.flip();
+    } else if (event.keyCode === 67) { // C (HOLD)
+        event.preventDefault();
+        humanPlayer.hold();
+        drawHoldAndNextUI();
+    }
+});
+
+initGame();
+gameLoop();
+</script>
+</body>
+</html>
