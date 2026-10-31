@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ペントミノ・テトリス (T-Spin & Kick対応)</title>
+    <title>ペントリス (T-Spin & Kick対応)</title>
     <style>
         body {
             background-color: #202028;
@@ -67,7 +67,7 @@
             gap: 12px;
             align-items: flex-start;
         }
-        canvas#tetris {
+        canvas#pentris {
             border: 2px solid #fff;
             background-color: #000;
         }
@@ -142,7 +142,7 @@
 </head>
 <body>
 
-    <h1>PENTOMINO TETRIS</h1>
+    <h1>PENTRIS</h1>
 
     <div class="settings">
         <label for="widthSelect">横幅:</label>
@@ -179,7 +179,7 @@
         </div>
 
         <!-- メイン画面 -->
-        <canvas id="tetris" width="360" height="300"></canvas>
+        <canvas id="pentris" width="360" height="300"></canvas>
 
         <!-- 右パネル：SCORE & NEXT -->
         <div class="side-panel">
@@ -202,7 +202,7 @@
     </div>
 
 <script>
-const canvas = document.getElementById('tetris');
+const canvas = document.getElementById('pentris');
 const context = canvas.getContext('2d');
 
 const holdCanvas = document.getElementById('holdCanvas');
