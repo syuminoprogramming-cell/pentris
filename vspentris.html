@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ペントミノ・テトリス (Player vs AI 対戦モード)</title>
+    <title>ペントリス (Player vs AI 対戦モード)</title>
     <style>
         body {
             background-color: #1a1a24;
@@ -245,7 +245,7 @@
 </head>
 <body>
 
-    <h1>PENTOMINO TETRIS : VS AI</h1>
+    <h1>PENTRIS : VS AI</h1>
 
     <div class="settings">
         <label for="aiSpeedSelect">AIスピード:</label>
@@ -437,7 +437,7 @@ let isBattleOver = false;
 let aiTimer = null;
 
 // プレイヤー管理クラス
-class TetrisPlayer {
+class PentrisPlayer {
     constructor(canvas, isAI = false) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
@@ -1055,8 +1055,8 @@ function initGame() {
     pCanvas.getContext('2d').setTransform(BLOCK_SIZE, 0, 0, BLOCK_SIZE, 0, 0);
     aCanvas.getContext('2d').setTransform(BLOCK_SIZE, 0, 0, BLOCK_SIZE, 0, 0);
 
-    humanPlayer = new TetrisPlayer(pCanvas, false);
-    aiPlayer = new TetrisPlayer(aCanvas, true);
+    humanPlayer = new PentrisPlayer(pCanvas, false);
+    aiPlayer = new PentrisPlayer(aCanvas, true);
 
     humanPlayer.resetPiece();
     aiPlayer.resetPiece();
